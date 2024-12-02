@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html th:replace="~{fragment/admin-layout.html :: layout(~{::main})}" xmlns:th="http://www.thymeleaf.org">
+<html th:replace="~{fragment/layoutV1.html :: layout(~{::main})}" xmlns:th="http://www.thymeleaf.org">
 
 
 
@@ -17,9 +17,9 @@
     <!-- row -->
         <div class="row ">
             <div class="d-flex justify-content-end">
-                <button type="button" th:onclick="|location.href='@{/admin-restaurants}'|" class="btn btn-outline-dark me-2" style="border-radius: 5%;">뒤로</button>
-                <button type="button" th:onclick="|location.href='@{/admin-restaurants/{id}/update(id = ${restaurant.id})}'|" class="btn btn-outline-info" style="border-radius: 5%;">수정</button>
-                <button type="button" th:onclick="|location.href='@{/admin-restaurants/{id}/delete(id = ${restaurant.id})}'|" class="btn btn-outline-danger mx-2" style="border-radius: 5%;">삭제</button>
+                <button type="button" th:onclick="|location.href='@{/restaurants}'|" class="btn btn-outline-dark me-2" style="border-radius: 5%;">뒤로</button>
+                <button type="button" th:onclick="|location.href='@{/restaurants/{id}/update(id = ${restaurant.id})}'|" class="btn btn-outline-info" style="border-radius: 5%;">수정</button>
+                <button type="button" th:onclick="|location.href='@{/restaurants/{id}/delete(id = ${restaurant.id})}'|" class="btn btn-outline-danger mx-2" style="border-radius: 5%;">삭제</button>
             </div>
             <div class="col-xl-12 col-12 mb-5">
                 <!-- card -->

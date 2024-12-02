@@ -1,12 +1,11 @@
 package com.ssg.adminportal.controller.web;
 
 import com.ssg.adminportal.common.*;
+import com.ssg.adminportal.domain.BusinessDay;
+import com.ssg.adminportal.domain.Food;
 import com.ssg.adminportal.domain.Restaurant;
-import com.ssg.adminportal.domain.Review;
 import com.ssg.adminportal.dto.FileDTO;
-import com.ssg.adminportal.dto.request.FoodSaveDTO;
-import com.ssg.adminportal.dto.request.RestaurantSaveDTO;
-import com.ssg.adminportal.dto.request.RestaurantUpdateDTO;
+import com.ssg.adminportal.dto.request.*;
 import com.ssg.adminportal.service.FileService;
 import com.ssg.adminportal.service.RestaurantService;
 import com.ssg.adminportal.service.ReviewService;
@@ -19,10 +18,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.*;
 
 @Slf4j
 @Controller
@@ -91,18 +89,21 @@ public class RestaurantController {
         return dayOfWeeks;
     }
 
-
-    @GetMapping("/{id}")
-    public String getReviewSentiment(@PathVariable Long id, Model model) {
-        model.addAttribute("sentiment", reviewService.getSentiment(id));
-        return "restaurant/restaurant";
+    @ModelAttribute("adminSortConditions")
+    public Map<String , String> adminSortConditions(){
+        Map<String, String> adminSortConditions = new HashMap<>();
+        adminSortConditions.put("NEW", "최신 순");
+        adminSortConditions.put("REGISTER", "등록 순");
+        return adminSortConditions;
     }
+
+
 
 
     @GetMapping("/save")
     public String saveRestaurant(Model model) {
         model.addAttribute("restaurantSaveDto", new RestaurantSaveDTO());
-        return "restaurant/admin-saveForm";
+        return "restaurant/saveForm";
     }
 
     @PostMapping("/save")
@@ -149,33 +150,79 @@ public class RestaurantController {
     @GetMapping("/{id}/update")
     public String updateRestaurant(@PathVariable("id") Long id ,  Model model) {
         Restaurant restaurant = restaurantService.findOne(id);
-        //RestaurantUpdateDTO restaurantUpdateDto = new RestaurantUpdateDTO(restaurant.getName() , restaurant.getBusinessNum() , restaurant.getRestaurantTypes() , restaurant.getContainFoodTypes() , restaurant.getProvideServiceTypes() , restaurant.getMoodTypes() , restaurant.getAddress().getRoadAddress() , restaurant.getAddress().getLandLotAddress() , restaurant.getAddress().getZipCode() , restaurant.getAddress().getDetailAddress() , restaurant.getCanPark() , restaurant.getReservationTimeGap() , restaurant.getIsPenalty());
-        model.addAttribute("restaurant", restaurant);
-        return "restaurant/admin-updateForm";
+        String reservationTimeGap = convertReservationTimeGapToString(restaurant.getReservationTimeGap());
+
+
+        RestaurantUpdateDTO restaurantUpdateDTO = new RestaurantUpdateDTO(restaurant.getName(), restaurant.getBusinessNum()
+                , restaurant.getRestaurantTypes(), restaurant.getContainFoodTypes()
+                , restaurant.getProvideServiceTypes(), restaurant.getMoodTypes(), restaurant.getAddress().getRoadAddress(),
+                restaurant.getAddress().getLandLotAddress(), restaurant.getAddress().getZipCode(),
+                restaurant.getAddress().getDetailAddress(), restaurant.getCanPark(),
+                reservationTimeGap, restaurant.getIsPenalty());
+        restaurantUpdateDTO.setRestaurantTypes(restaurant.getRestaurantTypes());
+        restaurantUpdateDTO.setContainFoodTypes(restaurant.getContainFoodTypes());
+        restaurantUpdateDTO.setMoodTypes(restaurant.getMoodTypes());
+        restaurantUpdateDTO.setProvideServiceTypes(restaurant.getProvideServiceTypes());
+        restaurantUpdateDTO.setRestaurantImagesUrl(Arrays.asList(restaurant.getRestaurantImages()));
+
+        List<BusinessDay> businessDays = restaurant.getBusinessDays();
+        List<String> dayOfWeeks = businessDays.stream().map(BusinessDay::getDayOfWeek).toList();
+        List<LocalTime> openTimes = businessDays.stream().map(BusinessDay::getOpenTime).toList();
+        List<LocalTime> closeTimes = businessDays.stream().map(BusinessDay::getCloseTime).toList();
+        List<LocalTime> breakStartTimes = businessDays.stream().map(BusinessDay::getBreakStartTime).toList();
+        List<LocalTime> breakEndTimes = businessDays.stream().map(BusinessDay::getBreakEndTime).toList();
+        List<Boolean> isDayOffList = businessDays.stream().map(BusinessDay::getIsDayOff).toList(); //false , false , true , true , false , false
+
+        restaurantUpdateDTO.setDayOfWeeks(dayOfWeeks);
+        restaurantUpdateDTO.setOpenTimes(openTimes);
+        restaurantUpdateDTO.setCloseTimes(closeTimes);
+        restaurantUpdateDTO.setBreakStartTimes(breakStartTimes);
+        restaurantUpdateDTO.setBreakEndTimes(breakEndTimes);
+        restaurantUpdateDTO.setIsDayOffList(isDayOffList);
+
+        List<Food> foods = restaurant.getFoods();
+        List<FoodUpdateDTO> foodUpdateDTOList = new ArrayList<>();
+        for (Food food : foods) {
+            foodUpdateDTOList.add(new FoodUpdateDTO(food.getName() , food.getPrice() , food.getImage()));
+        }
+        restaurantUpdateDTO.setFoodSaveDtoList(foodUpdateDTOList);
+
+
+        model.addAttribute("restaurantUpdateDTO", restaurantUpdateDTO);
+        return "restaurant/updateForm";
     }
 
+
+    private static String convertReservationTimeGapToString(Integer reservationTimeGap) {
+        String convertReservationTimeGapToString = "";
+        switch (reservationTimeGap) {
+            case 30:
+                convertReservationTimeGapToString =  "HALF";
+                break;
+            case 60:
+                convertReservationTimeGapToString = "ONE";
+                break;
+            case 120:
+                convertReservationTimeGapToString = "TWO";
+                break;
+        }
+
+        return convertReservationTimeGapToString;
+    }
+
+    @GetMapping
+    public String getAdminRestaurants(@ModelAttribute("restaurantAdminSearchCond") RestaurantAdminSearchCond restaurantAdminSearchCond , Model model) {
+        model.addAttribute("restaurants", restaurantService.findRestaurantsAdmin(restaurantAdminSearchCond));
+        return "restaurant/restaurants";
+    }
 
     @GetMapping("/{id}")
     public String getAdminRestaurant(@PathVariable("id") Long id, Model model) {
         model.addAttribute("restaurant", restaurantService.findOne(id));
-        return "restaurant/admin-restaurant";
+        model.addAttribute("sentiment", reviewService.getSentiment(id));
+        return "restaurant/restaurant";
     }
 
-
-    private Map<Integer, List<Review>> getReviewsByRating(Long id) {
-        List<Review> reviewsByOneRating = restaurantService.findReviewsByRating(id, 1);
-        List<Review> reviewsByTwoRating = restaurantService.findReviewsByRating(id, 2);
-        List<Review> reviewsByThreeRating = restaurantService.findReviewsByRating(id, 3);
-        List<Review> reviewsByFourRating = restaurantService.findReviewsByRating(id, 4);
-        List<Review> reviewsByFiveRating = restaurantService.findReviewsByRating(id, 5);
-        Map<Integer, List<Review>> reviewsByRating = new HashMap<>();
-        reviewsByRating.put(1, reviewsByOneRating);
-        reviewsByRating.put(2, reviewsByTwoRating);
-        reviewsByRating.put(3, reviewsByThreeRating);
-        reviewsByRating.put(4, reviewsByFourRating);
-        reviewsByRating.put(5, reviewsByFiveRating);
-        return reviewsByRating;
-    }
 
 
 
