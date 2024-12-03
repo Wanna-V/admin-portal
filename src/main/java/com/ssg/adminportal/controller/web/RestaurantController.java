@@ -1,26 +1,34 @@
 package com.ssg.adminportal.controller.web;
 
+
 import com.ssg.adminportal.common.*;
-import com.ssg.adminportal.domain.BusinessDay;
-import com.ssg.adminportal.domain.Food;
 import com.ssg.adminportal.domain.Restaurant;
 import com.ssg.adminportal.dto.FileDTO;
-import com.ssg.adminportal.dto.request.*;
+
+import com.ssg.adminportal.dto.request.FoodSaveDTO;
+import com.ssg.adminportal.dto.request.RestaurantAdminSearchCond;
+import com.ssg.adminportal.dto.request.RestaurantSaveDTO;
 import com.ssg.adminportal.service.FileService;
 import com.ssg.adminportal.service.RestaurantService;
 import com.ssg.adminportal.service.ReviewService;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.*;
 
 @Slf4j
 @Controller
@@ -58,7 +66,6 @@ public class RestaurantController {
         return MoodType.values();
     }
 
-
     @ModelAttribute("sortConditions")
     public Map<String, String> sortConditions() {
         Map<String, String> sortConditions = new HashMap<>();
@@ -70,11 +77,18 @@ public class RestaurantController {
     }
 
 
+    @ModelAttribute("adminSortConditions")
+    public Map<String , String> adminSortConditions(){
+        Map<String, String> adminSortConditions = new HashMap<>();
+        adminSortConditions.put("NEW", "최신 순");
+        adminSortConditions.put("REGISTER", "등록 순");
+        return adminSortConditions;
+    }
+
     @ModelAttribute("reservationTimeGaps")
     public ReservationTimeGap[] reservationGaps() {
         return ReservationTimeGap.values();
     }
-
 
     @ModelAttribute("dayOfWeeks")
     public List<String> dayOfWeeks() {
@@ -89,13 +103,7 @@ public class RestaurantController {
         return dayOfWeeks;
     }
 
-    @ModelAttribute("adminSortConditions")
-    public Map<String , String> adminSortConditions(){
-        Map<String, String> adminSortConditions = new HashMap<>();
-        adminSortConditions.put("NEW", "최신 순");
-        adminSortConditions.put("REGISTER", "등록 순");
-        return adminSortConditions;
-    }
+
 
 
 
@@ -108,10 +116,9 @@ public class RestaurantController {
 
     @PostMapping("/save")
     @ResponseBody
-    public String saveRestaurantPost(@ModelAttribute("restaurantSaveDto") RestaurantSaveDTO restaurantSaveDto, RedirectAttributes redirectAttributes) {
-        log.info("restaurant = {}" , restaurantSaveDto.getRestaurantImages());
-        log.info("food = {}", restaurantSaveDto.getFoodSaveDTOList());
-
+    public String saveRestaurantPost(
+            @ModelAttribute("restaurantSaveDto") RestaurantSaveDTO restaurantSaveDto,
+            RedirectAttributes redirectAttributes) {
 
         List<MultipartFile> restaurantImages = restaurantSaveDto.getRestaurantImages();
         List<MultipartFile> foodImages = new ArrayList<>();
@@ -123,74 +130,30 @@ public class RestaurantController {
         /**
          * 식당 스토리지 저장 + DB에 스토리지 Url 저장
          */
-        List<FileDTO> restaurantImagesFileDto = fileService.uploadFiles(restaurantImages, restaurantDir);
-        List<String> restaurantImagesUrl = restaurantImagesFileDto.stream().map(FileDTO::getUploadFileUrl).toList();
+        List<FileDTO> restaurantImagesFileDto = fileService.uploadFiles(restaurantImages,
+                restaurantDir);
+        List<String> restaurantImagesUrl = restaurantImagesFileDto.stream()
+                .map(FileDTO::getUploadFileUrl).toList();
         restaurantSaveDto.setRestaurantImagesUrl(restaurantImagesUrl);
 
         /**
          * 음식 스토리지 저장 + DB에 스토리지 Url 저장
          */
         List<FileDTO> foodImagesFileDto = fileService.uploadFiles(foodImages, foodDir);
-        List<String> foodImagesUrl = foodImagesFileDto.stream().map(FileDTO::getUploadFileUrl).toList();
+        List<String> foodImagesUrl = foodImagesFileDto.stream().map(FileDTO::getUploadFileUrl)
+                .toList();
         for (String foodImageUrl : foodImagesUrl) {
             foodSaveDTOList.forEach(foodSaveDTO -> {
                 foodSaveDTO.setFoodImageUrl(foodImageUrl);
             });
-        };
-
-        log.info("restaurantSaveDto = {}" , restaurantSaveDto);
-        log.info("foodSaveDtoList = {}" , restaurantSaveDto.getFoodSaveDTOList());
+        }
+        ;
 
         Long saveId = restaurantService.save(restaurantSaveDto);
         redirectAttributes.addAttribute("saveId", saveId);
         return "success";
     }
 
-
-    @GetMapping("/{id}/update")
-    public String updateRestaurant(@PathVariable("id") Long id ,  Model model) {
-        Restaurant restaurant = restaurantService.findOne(id);
-        String reservationTimeGap = convertReservationTimeGapToString(restaurant.getReservationTimeGap());
-
-
-        RestaurantUpdateDTO restaurantUpdateDTO = new RestaurantUpdateDTO(restaurant.getName(), restaurant.getBusinessNum()
-                , restaurant.getRestaurantTypes(), restaurant.getContainFoodTypes()
-                , restaurant.getProvideServiceTypes(), restaurant.getMoodTypes(), restaurant.getAddress().getRoadAddress(),
-                restaurant.getAddress().getLandLotAddress(), restaurant.getAddress().getZipCode(),
-                restaurant.getAddress().getDetailAddress(), restaurant.getCanPark(),
-                reservationTimeGap, restaurant.getIsPenalty());
-        restaurantUpdateDTO.setRestaurantTypes(restaurant.getRestaurantTypes());
-        restaurantUpdateDTO.setContainFoodTypes(restaurant.getContainFoodTypes());
-        restaurantUpdateDTO.setMoodTypes(restaurant.getMoodTypes());
-        restaurantUpdateDTO.setProvideServiceTypes(restaurant.getProvideServiceTypes());
-        restaurantUpdateDTO.setRestaurantImagesUrl(Arrays.asList(restaurant.getRestaurantImages()));
-
-        List<BusinessDay> businessDays = restaurant.getBusinessDays();
-        List<String> dayOfWeeks = businessDays.stream().map(BusinessDay::getDayOfWeek).toList();
-        List<LocalTime> openTimes = businessDays.stream().map(BusinessDay::getOpenTime).toList();
-        List<LocalTime> closeTimes = businessDays.stream().map(BusinessDay::getCloseTime).toList();
-        List<LocalTime> breakStartTimes = businessDays.stream().map(BusinessDay::getBreakStartTime).toList();
-        List<LocalTime> breakEndTimes = businessDays.stream().map(BusinessDay::getBreakEndTime).toList();
-        List<Boolean> isDayOffList = businessDays.stream().map(BusinessDay::getIsDayOff).toList(); //false , false , true , true , false , false
-
-        restaurantUpdateDTO.setDayOfWeeks(dayOfWeeks);
-        restaurantUpdateDTO.setOpenTimes(openTimes);
-        restaurantUpdateDTO.setCloseTimes(closeTimes);
-        restaurantUpdateDTO.setBreakStartTimes(breakStartTimes);
-        restaurantUpdateDTO.setBreakEndTimes(breakEndTimes);
-        restaurantUpdateDTO.setIsDayOffList(isDayOffList);
-
-        List<Food> foods = restaurant.getFoods();
-        List<FoodUpdateDTO> foodUpdateDTOList = new ArrayList<>();
-        for (Food food : foods) {
-            foodUpdateDTOList.add(new FoodUpdateDTO(food.getName() , food.getPrice() , food.getImage()));
-        }
-        restaurantUpdateDTO.setFoodSaveDtoList(foodUpdateDTOList);
-
-
-        model.addAttribute("restaurantUpdateDTO", restaurantUpdateDTO);
-        return "restaurant/updateForm";
-    }
 
 
     private static String convertReservationTimeGapToString(Integer reservationTimeGap) {
@@ -222,9 +185,6 @@ public class RestaurantController {
         model.addAttribute("sentiment", reviewService.getSentiment(id));
         return "restaurant/restaurant";
     }
-
-
-
 
 
 
